@@ -10,6 +10,7 @@ type RateLimit struct {
 	ch    chan interface{}
 }
 
+// New return a Ratelimit instance and initialize it
 func New(d time.Duration, limit int) *RateLimit {
 	if limit == 0 || d == 0 {
 		panic("limit/duration cannot be 0")
@@ -23,6 +24,7 @@ func New(d time.Duration, limit int) *RateLimit {
 	return &r
 }
 
+// backgroundRoutine launches a goroutine to empty the channel every r.d duration
 func (r *RateLimit) backgroundRoutine() {
 	go func() {
 		t := time.NewTicker(r.d)
@@ -37,6 +39,7 @@ func (r *RateLimit) backgroundRoutine() {
 	}()
 }
 
+// WaitIfLimitReached wait if limit has been reached
 func (r *RateLimit) WaitIfLimitReached() {
 	r.ch <- struct{}{}
 }
