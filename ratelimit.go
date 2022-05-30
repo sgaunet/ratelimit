@@ -43,3 +43,8 @@ func (r *RateLimit) backgroundRoutine() {
 func (r *RateLimit) WaitIfLimitReached() {
 	r.ch <- struct{}{}
 }
+
+// IsLimitReached returns true if limit hasbeen reached
+func (r *RateLimit) IsLimitReached() bool {
+	return len(r.ch) == r.limit
+}
