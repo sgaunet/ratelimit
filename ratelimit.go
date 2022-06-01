@@ -46,5 +46,10 @@ func (r *RateLimit) WaitIfLimitReached() {
 
 // IsLimitReached returns true if limit hasbeen reached
 func (r *RateLimit) IsLimitReached() bool {
-	return len(r.ch) == r.limit
+	select {
+	case r.ch <- struct{}{}:
+		return false
+	default:
+		return true
+	}
 }
