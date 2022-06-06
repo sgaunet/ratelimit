@@ -1,0 +1,6 @@
+go 1.18
+
+use (
+    /home/sylvain/GITHUB/PUBLIC/ratelimit
+    /home/sylvain/GITHUB/PUBLIC/ratelimit/example
+)
