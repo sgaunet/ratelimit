@@ -119,6 +119,8 @@ func initLog(debugLevel string) *logrus.Logger {
 	l.SetOutput(os.Stdout)
 
 	switch debugLevel {
+	case "debug":
+		l.SetLevel(logrus.DebugLevel)
 	case "info":
 		l.SetLevel(logrus.InfoLevel)
 	case "warn":
