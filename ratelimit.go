@@ -10,12 +10,13 @@ import (
 )
 
 type RateLimit struct {
-	d     time.Duration
-	limit int
-	ch    chan interface{}
-	ctx   context.Context
-	t     *time.Ticker
-	log   *logrus.Logger
+	d        time.Duration
+	limit    int
+	ch       chan interface{}
+	ctx      context.Context
+	t        *time.Ticker
+	lastCall time.Time
+	log      *logrus.Logger
 }
 
 // New returns a Ratelimit instance and initialize it
@@ -25,11 +26,12 @@ func New(ctx context.Context, d time.Duration, limit int) (*RateLimit, error) {
 	}
 
 	r := RateLimit{
-		d:     d,
-		limit: limit,
-		ch:    make(chan interface{}, limit),
-		ctx:   ctx,
-		log:   initLog(os.Getenv("RATELIMIT_LOGLEVEL")),
+		d:        d,
+		limit:    limit,
+		ch:       make(chan interface{}, limit),
+		ctx:      ctx,
+		log:      initLog(os.Getenv("RATELIMIT_LOGLEVEL")),
+		lastCall: time.Now(),
 	}
 	r.backgroundRoutine()
 	r.handleCtx()
@@ -68,6 +70,7 @@ func (r *RateLimit) handleCtx() {
 // WaitIfLimitReached wait if limit has been reached
 // do not use IsLimitReached and WaitIFLimitReached in the same algo
 func (r *RateLimit) WaitIfLimitReached() {
+	r.lastCall = time.Now()
 	select {
 	case <-r.ctx.Done():
 		r.log.Debugln("End WaitIfLimitReached")
@@ -80,6 +83,7 @@ func (r *RateLimit) WaitIfLimitReached() {
 // IsLimitReached returns true if limit has been reached
 // do not use IsLimitReached and WaitIFLimitReached in the same algo
 func (r *RateLimit) IsLimitReached() bool {
+	r.lastCall = time.Now()
 	if r.ctx.Err() != nil {
 		// program is going to be terminated
 		return false
@@ -90,6 +94,10 @@ func (r *RateLimit) IsLimitReached() bool {
 	default:
 		return true
 	}
+}
+
+func (r *RateLimit) GetLastCall() time.Time {
+	return r.lastCall
 }
 
 func (r *RateLimit) emptyChan() {
