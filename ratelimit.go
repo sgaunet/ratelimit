@@ -12,7 +12,7 @@ import (
 type RateLimit struct {
 	d        time.Duration
 	limit    int
-	ch       chan interface{}
+	ch       chan struct{}
 	ctx      context.Context
 	t        *time.Ticker
 	lastCall time.Time
@@ -28,7 +28,7 @@ func New(ctx context.Context, d time.Duration, limit int) (*RateLimit, error) {
 	r := RateLimit{
 		d:        d,
 		limit:    limit,
-		ch:       make(chan interface{}, limit),
+		ch:       make(chan struct{}, limit),
 		ctx:      ctx,
 		log:      initLog(os.Getenv("RATELIMIT_LOGLEVEL")),
 		lastCall: time.Now(),
@@ -71,12 +71,17 @@ func (r *RateLimit) handleCtx() {
 // do not use IsLimitReached and WaitIFLimitReached in the same algo
 func (r *RateLimit) WaitIfLimitReached() {
 	r.lastCall = time.Now()
-	select {
-	case <-r.ctx.Done():
-		r.log.Debugln("End WaitIfLimitReached")
-		return
-	default:
-		r.ch <- struct{}{}
+
+	for {
+		select {
+		case <-r.ctx.Done():
+			r.log.Debugln("End WaitIfLimitReached")
+			return
+		case r.ch <- struct{}{}:
+			return
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 }
 
@@ -139,4 +144,13 @@ func initLog(debugLevel string) *logrus.Logger {
 		l.SetLevel(logrus.InfoLevel)
 	}
 	return l
+}
+
+// Stop close background Goroutine
+func (r *RateLimit) Stop() {
+	r.log.Debugln("Stop Ticker")
+	r.t.Stop()
+	r.log.Debugln("Empty chan")
+	r.emptyChan()
+	time.Sleep(100 * time.Millisecond)
 }
