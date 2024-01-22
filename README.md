@@ -1,3 +1,5 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/sgaunet/ratelimit)](https://goreportcard.com/report/github.com/sgaunet/ratelimit)
+
 
 # ratelimit
 
