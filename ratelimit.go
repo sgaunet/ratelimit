@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -26,14 +27,17 @@ type RateLimit struct {
 	d        time.Duration
 	limit    int
 	ch       chan struct{}
-	t        *time.Ticker
-	lastCall time.Time
 	log      *logrus.Logger
 
 	// done channel to signal context cancellation
 	done chan struct{}
 	// cancelFunc is used to cancel the background routines
 	cancelFunc context.CancelFunc
+
+	// Mutex to protect concurrent access to shared state
+	mu       sync.RWMutex
+	t        *time.Ticker
+	lastCall time.Time
 }
 
 // New returns a Ratelimit instance and initialize it.
@@ -69,7 +73,7 @@ func New(ctx context.Context, d time.Duration, limit int) (*RateLimit, error) {
 // WaitIfLimitReached wait if limit has been reached.
 // do not use IsLimitReached and WaitIFLimitReached in the same algo.
 func (r *RateLimit) WaitIfLimitReached() {
-	r.lastCall = time.Now()
+	r.setLastCall(time.Now())
 
 	for {
 		select {
@@ -87,7 +91,7 @@ func (r *RateLimit) WaitIfLimitReached() {
 // IsLimitReached returns true if limit has been reached.
 // do not use IsLimitReached and WaitIFLimitReached in the same algo.
 func (r *RateLimit) IsLimitReached() bool {
-	r.lastCall = time.Now()
+	r.setLastCall(time.Now())
 	
 	select {
 	case <-r.done:
@@ -107,32 +111,61 @@ func (r *RateLimit) IsLimitReached() bool {
 
 // GetLastCall returns the time of the last call to WaitIfLimitReached or IsLimitReached.
 func (r *RateLimit) GetLastCall() time.Time {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.lastCall
 }
 
 // Stop close background Goroutine.
 func (r *RateLimit) Stop() {
 	r.log.Debugln("Stop Ticker")
-	r.t.Stop()
+	
+	// Stop the ticker safely
+	r.mu.Lock()
+	if r.t != nil {
+		r.t.Stop()
+	}
+	r.mu.Unlock()
+	
 	r.log.Debugln("Empty chan")
 	r.emptyChan()
 	time.Sleep(stopSleepDuration)
+}
+
+// setLastCall safely sets the lastCall timestamp.
+func (r *RateLimit) setLastCall(t time.Time) {
+	r.mu.Lock()
+	r.lastCall = t
+	r.mu.Unlock()
+}
+
+// setTicker safely sets the ticker.
+func (r *RateLimit) setTicker(ticker *time.Ticker) {
+	r.mu.Lock()
+	r.t = ticker
+	r.mu.Unlock()
 }
 
 // backgroundRoutine launches a goroutine to empty the channel every r.d duration.
 func (r *RateLimit) backgroundRoutine(ctx context.Context) {
 	r.log.Debugln("Start backgroundRoutine")
 	go func() {
-		r.t = time.NewTicker(r.d)
+		ticker := time.NewTicker(r.d)
+		r.setTicker(ticker)
+		
 	loop:
 		for {
 			select {
-			case <-r.t.C:
+			case <-ticker.C:
 				r.emptyChan()
 			case <-ctx.Done():
 				break loop
 			}
 		}
+		
+		// Clean up ticker
+		ticker.Stop()
+		r.setTicker(nil)
 		r.log.Debugln("Stop backgroundRoutine")
 	}()
 }
@@ -141,7 +174,14 @@ func (r *RateLimit) handleCtx(ctx context.Context) {
 	go func() {
 		<-ctx.Done()
 		r.log.Debugln("Stop Ticker")
-		r.t.Stop()
+		
+		// Stop the ticker safely
+		r.mu.Lock()
+		if r.t != nil {
+			r.t.Stop()
+		}
+		r.mu.Unlock()
+		
 		r.log.Debugln("Empty chan")
 		r.emptyChan()
 		r.log.Debugln("End of handleCtx")
