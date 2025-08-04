@@ -1,5 +1,6 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/sgaunet/ratelimit)](https://goreportcard.com/report/github.com/sgaunet/ratelimit)
 [![GitHub release](https://img.shields.io/github/release/sgaunet/ratelimit.svg)](https://github.com/sgaunet/ratelimit/releases/latest)
+![Coverage](https://raw.githubusercontent.com/wiki/sgaunet/ratelimit/coverage-badge.svg)
 [![GoDoc](https://godoc.org/github.com/sgaunet/ratelimit?status.svg)](https://godoc.org/github.com/sgaunet/ratelimit)
 [![License](https://img.shields.io/github/license/sgaunet/ratelimit.svg)](LICENSE)
 
